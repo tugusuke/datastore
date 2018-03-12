@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/favclip/testerator"
 	_ "github.com/favclip/testerator/datastore"
@@ -929,5 +930,75 @@ func TestAEDatastore_Namespace(t *testing.T) {
 	}
 	if v := len(keys); v != 1 {
 		t.Fatalf("unexpected: %v", v)
+	}
+}
+
+func TestAEDatastore_Issue39A(t *testing.T) {
+	ctx, close, err := newContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer close()
+
+	type Cheese struct{}
+	type Contains struct {
+		Cheese      Cheese
+		ExtraCheese *Cheese
+	}
+	type Burger struct {
+		Contains
+	}
+
+	burger := Burger{
+		Contains{
+			Cheese:      Cheese{},
+			ExtraCheese: &Cheese{},
+		},
+	}
+
+	key := datastore.NewKey(ctx, "Burger", "a", 0, nil)
+	_, err = datastore.Put(ctx, key, &burger)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAEDatastore_Issue39B(t *testing.T) {
+	ctx, close, err := newContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer close()
+
+	type Location struct {
+		Lat float64 `json:"lat"`
+		Lng float64 `json:"lng"`
+	}
+	type LocalAccessID struct {
+		UserID int64 `datastore:"UserId"`
+		Location
+	}
+	type LocalAccess struct {
+		LocalAccessID
+		PreciseLocation Location  `datastore:"PreciseLocation"`
+		Count           int64     `datastore:"Count"`
+		UpdatedTime     time.Time `datastore:"UpdatedTime"`
+		CreatedTime     time.Time `datastore:"CreatedTime"`
+	}
+
+	dat := &LocalAccess{
+		LocalAccessID: LocalAccessID{
+			UserID:   1,
+			Location: Location{10.78, 20.35},
+		},
+		PreciseLocation: Location{10.78, 20.35},
+		UpdatedTime:     time.Now(),
+		CreatedTime:     time.Now(),
+	}
+
+	key := datastore.NewKey(ctx, "LocalAccess", "1-10.78-20.35", 0, nil)
+	_, err = datastore.Put(ctx, key, &dat)
+	if err != nil {
+		t.Fatal(err)
 	}
 }
